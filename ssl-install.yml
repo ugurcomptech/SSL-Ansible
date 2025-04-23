@@ -1,0 +1,33 @@
+- name: Install and Configure SSL with Certbot
+  hosts: test-server
+  become: yes
+  vars:
+    domain_name: test.com
+    email: test@test.com
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Certbot and nginx plugin
+      ansible.builtin.apt:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain SSL certificate using Certbot
+      ansible.builtin.command:
+        argv:
+          - certbot
+          - --nginx
+          - -n
+          - --agree-tos
+          - --redirect
+          - --email
+          - "{{ email }}"
+          - -d
+          - "{{ domain_name }}"
+      args:
+        creates: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
