@@ -1,72 +1,74 @@
-
 # Ansible ile SSL Sertifikası Kurulumu
 
-Bu dökümanda, Ansible kullanarak uzak sunuculara nasıl otomatik olarak SSL sertifikası kurulacağı adım adım anlatılmaktadır.
+Bu döküman, Ansible aracı ile belirlemiş olduğunuz sunuculara nasıl otomatik olarak SSL sertifikası kurulabileceğini adım adım anlatmaktadır.
 
-## 🔧 Ansible Kurulumu
+## Ansible Playbook Açıklamaları
 
-Ubuntu sunucunuza Ansible kurmak için aşağıdaki komutu çalıştırın:
-
-```bash
-sudo apt install ansible
-```
-
-Kurulumdan sonra servisin durumunu kontrol etmek için:
-
-```bash
-systemctl status ansible
-```
-
-## 📁 inventory.ini Oluşturma
-
-Sunucularınızı tanımlamak için bir `inventory.ini` dosyası oluşturmanız gerekir:
-
-```ini
-[test-server]
-192.168.1.1
-```
-
-Sunucunuza özel SSH portu veya özel anahtar kullanıyorsanız:
-
-```ini
-[waf-server]
-192.168.1.2 ansible_port=4478
-
-[mail-server]
-192.168.1.3 ansible_port=22 ansible_ssh_private_key_file=/root/private.key
-```
-
-## 📂 Proje Klasörü ve Playbook Dosyası
-
-Önce bir klasör oluşturalım:
-
-```bash
-mkdir -p ssl-ansible
-cd ssl-ansible
-```
-
-Sonrasında `ssl-install.yml` adında bir playbook dosyası oluşturarak şu içeriği ekleyin:
+### 🔹 Genel Başlık
 
 ```yaml
 - name: Install and Configure SSL with Certbot
   hosts: test-server
   become: yes
+```
+
+**Açıklama:**
+- `name`: Playbook'un başlığıdır.
+- `hosts`: `inventory.ini` dosyasındaki grup adıdır.
+- `become: yes`: Root yetkisi gerektiren işlemler için sudo kullanılır.
+
+---
+
+### 🔹 Değişken Tanımlamaları
+
+```yaml
   vars:
     domain_name: test.com
     email: test@test.com
+```
 
+**Açıklama:**
+- SSL kurulumu için gerekli domain ve e-posta değişkenleri tanımlanır.
+- İleride komutlarda `{{ domain_name }}` ve `{{ email }}` olarak kullanılırlar.
+
+---
+
+### 🔹 APT Cache Güncelleme
+
+```yaml
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: yes
+```
 
+**Açıklama:**
+- Sunucunun paket listesi güncellenir.
+- Bu işlem, sistemin en güncel paket bilgisiyle çalışmasını sağlar.
+
+---
+
+### 🔹 Certbot ve Nginx Plugin Kurulumu
+
+```yaml
     - name: Install Certbot and nginx plugin
       ansible.builtin.apt:
         name:
           - certbot
           - python3-certbot-nginx
         state: present
+```
 
+**Açıklama:**
+- `certbot`: SSL sertifikası almak için kullanılır.
+- `python3-certbot-nginx`: Nginx ile Certbot'u entegre eder.
+- `state: present`: Paketler eksikse yüklenir, zaten varsa işlem yapılmaz.
+
+---
+
+### 🔹 SSL Sertifikası Alınması
+
+```yaml
     - name: Obtain SSL certificate using Certbot
       ansible.builtin.command:
         argv:
@@ -83,24 +85,24 @@ Sonrasında `ssl-install.yml` adında bir playbook dosyası oluşturarak şu iç
         creates: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
 ```
 
-### Açıklamalar:
-
-- `become: yes`: Root yetkisi gerektiren işlemler için.
-- `vars`: Değişkenleri tanımlıyoruz (domain ve email).
-- `state: present`: Paket zaten yüklü değilse yüklenmesini sağlar.
-- `argv`: Terminalde çalışacak komutları listeler.
-- `creates`: Eğer belirtilen dosya zaten varsa komut çalıştırılmaz.
-
-## ✅ Çalıştırma
-
-Playbook'u çalıştırmak için:
-
-```bash
-ansible-playbook -i inventory.ini ssl-install.yml
-```
-
-Bu playbook sayesinde bir veya birden fazla sunucuya otomatik olarak SSL sertifikası kurulabilir.
+**Açıklama:**
+- Certbot komutu çalıştırılır.
+- `--nginx`: Nginx yapılandırması kullanılır.
+- `--redirect`: HTTP'den HTTPS'e yönlendirme yapılır.
+- `--agree-tos`: Kullanım şartları kabul edilir.
+- `creates`: Bu dosya varsa komut tekrar çalışmaz.
 
 ---
 
-💡 Sorularınız için PR veya issue açabilirsiniz.
+## Örnek `inventory.ini`
+
+```ini
+[test-server]
+192.168.1.10 ansible_port=22 ansible_ssh_private_key_file=/root/private.key
+```
+
+Bu dosyada sunucularınız tanımlanır ve `hosts:` parametresiyle eşleşir.
+
+---
+
+Bu yapı sayesinde birden fazla sunucuya otomatik SSL kurulumu gerçekleştirebilirsiniz.
